@@ -46,6 +46,7 @@ export interface WeddingData {
     name: LocalizedString;
     address: LocalizedString;
     mapUrl: string;
+    parkingUrl?: string;
   };
   message: LocalizedString;
   googleFormUrl: string; 
