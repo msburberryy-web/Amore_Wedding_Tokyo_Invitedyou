@@ -1,15 +1,15 @@
 {
   "groomName": {
-    "en": "Aki",
-    "ja": "アキ",
-    "my": "Aki"
+    "en": "Groom",
+    "ja": "ア",
+    "my": "Groom"
   },
   "brideName": {
-    "en": "Meme",
-    "ja": "ミミ",
-    "my": "Meme"
+    "en": "Bride",
+    "ja": "イ",
+    "my": "Bride"
   },
-  "date": "2026-05-03T10:30:00",
+  "date": "2026-03-20T10:30:00",
   "showCountdown": true,
   "rsvpDeadline": "2026-03-20",
   "location": {
@@ -31,7 +31,7 @@
     "my": "ကျွန်ုပ်တို့၏ မင်္ဂလာပွဲသို့ ကြွရောက်ချီးမြှင့်ပါရန် ဖိတ်ကြားအပ်ပါသည်။"
   },
   "googleFormUrl": "",
-  "googleScriptUrl": "https://script.google.com/macros/s/AKfycby5boT7JzwmZR1RUsiozOUce_yLSo_Nbxoq-gC5RgBHsgZszvnPtkH4tlG04eT6pMAZPQ/exec",
+  "googleScriptUrl": "script url here",
   "showSchedule": true,
   "schedule": [
     {
@@ -180,16 +180,16 @@
   ],
   "showGallery": true,
   "gallery": [
-    "./photos/gallery1.jpg",
-    "./photos/cover.jpg",
-    "./photos/groom.jpg",
-    "./photos/bride.jpg"
+    "./photos/default/gallery1.jpg",
+    "./photos/default/cover.jpg",
+    "./photos/default/groom.jpg",
+    "./photos/default/bride.jpg"
   ],
   "musicUrl": "",
   "images": {
-    "hero": "./photos/cover.jpg",
-    "groom": "./photos/groom.jpg",
-    "bride": "./photos/bride.jpg"
+    "hero": "./photos/default/cover.jpg",
+    "groom": "./photos/default/groom.jpg",
+    "bride": "./photos/default/bride.jpg"
   },
   "theme": {
     "primary": "#C5A059",
