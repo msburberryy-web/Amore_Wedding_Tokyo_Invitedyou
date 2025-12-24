@@ -129,6 +129,8 @@ const App: React.FC = () => {
   const scheduleRef = useRef<HTMLDivElement>(null);
   const accessRef = useRef<HTMLDivElement>(null);
   const galleryRef = useRef<HTMLDivElement>(null);
+  // DOM ref for the embedded map iframe to help debug deployed behavior
+  const mapFrameRef = useRef<HTMLIFrameElement | null>(null);
 
   const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
     if (ref.current) ref.current.scrollIntoView({ behavior: 'smooth' });
@@ -180,18 +182,66 @@ const App: React.FC = () => {
       const eventFileName = eventParam.replace(/\./g, '_');
       dataFile = `./wedding-data_${eventFileName}.json`;
     }
-    
-    // Debugging: print which file we are attempting to fetch (helps diagnose mobile issues)
-    console.debug("Attempting to fetch wedding config:", dataFile);
 
-    fetch(dataFile)
+    // Client-side cache/version strategy
+    const ASSET_VERSION = import.meta.env.VITE_ASSET_VERSION || null; // set this in CI (recommended)
+    const ASSET_TTL_HOURS = Number(import.meta.env.VITE_ASSET_TTL_HOURS) || 24; // fallback TTL when no version provided
+
+    try {
+      const storedVersion = localStorage.getItem('amore_asset_version');
+      if (ASSET_VERSION) {
+        if (storedVersion !== ASSET_VERSION) {
+          console.info('Asset version changed; clearing cached wedding data and service workers.');
+          localStorage.removeItem('amore_wedding_data');
+          localStorage.setItem('amore_asset_version', ASSET_VERSION);
+          // Unregister any active service workers to avoid stale SW caching
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister().then(() => console.debug('Service worker unregistered.')))).catch(() => {});
+          }
+        }
+      } else {
+        // No build-time version provided — use TTL to occasionally clear cache
+        const lastCheck = Number(localStorage.getItem('amore_version_checked') || 0);
+        if (!lastCheck || (Date.now() - lastCheck) > ASSET_TTL_HOURS * 3600 * 1000) {
+          console.info('No asset version set; TTL expired — clearing cached wedding data.');
+          localStorage.removeItem('amore_wedding_data');
+          localStorage.setItem('amore_version_checked', String(Date.now()));
+        }
+      }
+    } catch (e) {
+      console.debug('Cache/version check failed', e);
+    }
+
+    // Build the fetch URL with a cache-busting query parameter (prefer build-time version if available)
+    const assetKey = ASSET_VERSION || localStorage.getItem('amore_asset_version') || localStorage.getItem('amore_version_checked') || String(Date.now());
+    const dataFileUrl = `${dataFile}${dataFile.includes('?') ? '&' : '?'}v=${assetKey}`;
+
+    // Debugging: print which file we are attempting to fetch (helps diagnose mobile issues)
+    console.debug('Attempting to fetch wedding config:', dataFileUrl);
+
+    fetch(dataFileUrl)
       .then(async res => {
         // If the response is not OK, bail out
-        if (!res.ok) throw new Error("No external config found");
-        // Some hosts do not set the content-type header correctly; attempt to parse JSON regardless
+        if (!res.ok) {
+          console.warn("External config fetch failed with status:", res.status, res.statusText);
+          throw new Error("No external config found");
+        }
+
+        // If the server responds with HTML (common when static hosts rewrite unknown files to index.html),
+        // log a helpful warning and bail out so we fall back to the default data.
+        const contentType = (res.headers.get("content-type") || '').toLowerCase();
+        if (contentType.includes('text/html')) {
+          const body = await res.text();
+          console.warn("External config fetch returned HTML (likely a 404 rewrite to index.html).\nStatus:", res.status, "Snippet:", body.slice(0, 300));
+          throw new Error("Invalid external config (HTML received)");
+        }
+
+        // Try to parse JSON; if parsing fails, show a snippet of the response for diagnosis.
         try {
           return await res.json();
         } catch (e) {
+          const body = await res.clone().text();
+          console.warn("Failed to parse JSON when loading external config. Snippet:", body.slice(0, 300));
           throw new Error("Invalid JSON response when loading external config");
         }
       })
@@ -214,6 +264,14 @@ const App: React.FC = () => {
         
         // Replace photo paths with event-specific folder
         merged = replacePhotoPathsWithEventFolder(merged, eventParam);
+
+        // Diagnostic: show exactly what map URL we ended up with in the merged data
+        console.debug("External mapUrl:", externalData.location?.mapUrl);
+        console.debug("Merged location.mapUrl:", merged.location?.mapUrl);
+        if (merged.location?.mapUrl === DEFAULT_DATA.location.mapUrl) {
+          console.warn("Merged map URL equals DEFAULT_DATA.location.mapUrl — the external config might not include a mapUrl or it was rejected.");
+        }
+
         setData(merged);
       })
       .catch((e) => {
@@ -332,6 +390,27 @@ const App: React.FC = () => {
     '--color-bg-tint': hexToRgb(theme.backgroundTint),
     '--font-main': activeFont ? activeFont.replace(/"/g, '') : 'serif', 
   } as React.CSSProperties;
+
+  // Log actual DOM iframe src after the merged mapUrl is applied so we can detect differences in deployed builds
+  useEffect(() => {
+    // Small timeout allows DOM to update
+    const t = setTimeout(() => {
+      try {
+        const domSrc = mapFrameRef.current?.getAttribute('src');
+        console.debug('Map iframe DOM src (from ref):', domSrc);
+        // Attempt to read the iframe's current location - will throw if cross-origin
+        try {
+          const winLoc = mapFrameRef.current?.contentWindow?.location?.href;
+          console.debug('Map iframe contentWindow.location.href:', winLoc);
+        } catch (e) {
+          console.debug('Map iframe contentLocation: cross-origin or unavailable');
+        }
+      } catch (e) {
+        console.debug('Map iframe debug failed', e);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [data.location.mapUrl]);
 
   const showEnvelope = data.visuals?.enableEnvelope && !isEnvelopeOpen && !showAdmin;
   const contentAnimationClass = (!data.visuals?.enableEnvelope || isEnvelopeOpen) && data.visuals?.enableAnimations ? 'fade-in' : 'opacity-0';
@@ -503,8 +582,15 @@ const App: React.FC = () => {
                     <h3 className="text-2xl font-serif font-bold mb-4 text-gray-800">{data.location.name[lang]}</h3>
                     <p className="text-gray-500 mb-8 font-light">{data.location.address[lang]}</p>
                     <div className="h-64 md:h-80 w-full bg-gray-200 mb-8 grayscale hover:grayscale-0 transition-all duration-700">
-                         <iframe src={data.location.mapUrl} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" />
+                         <iframe ref={mapFrameRef} src={data.location.mapUrl} width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" />
                     </div>
+
+                    {/* Diagnostic: log the iframe DOM src after mapUrl changes (helps confirm deployed DOM matches merged data) */}
+                    <script dangerouslySetInnerHTML={{ __html: `
+                      (function(){
+                        try { console.debug('DOM iframe src (immediate):', document.querySelector('iframe[loading="lazy"]').getAttribute('src')); } catch(e){}
+                      })();
+                    ` }} />
                     <div className="flex flex-col md:flex-row justify-center gap-4">
                         <a href={googleUrl} target="_blank" rel="noopener noreferrer" className="px-8 py-3 bg-white border border-gray-300 text-gray-600 text-xs font-bold uppercase tracking-widest hover:bg-wedding-text hover:text-white hover:border-wedding-text transition-colors shadow-sm">{t.googleCal}</a>
                         <button onClick={downloadIcs} className="px-8 py-3 bg-white border border-gray-300 text-gray-600 text-xs font-bold uppercase tracking-widest hover:bg-wedding-text hover:text-white hover:border-wedding-text transition-colors shadow-sm">{t.appleCal}</button>
