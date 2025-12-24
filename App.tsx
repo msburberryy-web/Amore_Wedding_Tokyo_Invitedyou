@@ -181,13 +181,19 @@ const App: React.FC = () => {
       dataFile = `./wedding-data_${eventFileName}.json`;
     }
     
+    // Debugging: print which file we are attempting to fetch (helps diagnose mobile issues)
+    console.debug("Attempting to fetch wedding config:", dataFile);
+
     fetch(dataFile)
-      .then(res => {
-        const contentType = res.headers.get("content-type");
-        if (!res.ok || (contentType && contentType.indexOf("application/json") === -1)) {
-           throw new Error("No external config found");
+      .then(async res => {
+        // If the response is not OK, bail out
+        if (!res.ok) throw new Error("No external config found");
+        // Some hosts do not set the content-type header correctly; attempt to parse JSON regardless
+        try {
+          return await res.json();
+        } catch (e) {
+          throw new Error("Invalid JSON response when loading external config");
         }
-        return res.json();
       })
       .then(externalData => {
         console.log("Loaded wedding configuration");
