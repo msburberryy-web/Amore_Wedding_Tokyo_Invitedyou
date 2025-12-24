@@ -2,12 +2,12 @@
   "groomName": {
     "en": "Zin",
     "ja": "ジン",
-    "my": "Zin"
+    "my": "ဇင်"
   },
   "brideName": {
     "en": "Zue",
     "ja": "ズー",
-    "my": "Zue"
+    "my": "ဇူး"
   },
   "date": "2026-02-14T17:00:00",
   "showCountdown": true,
@@ -45,7 +45,7 @@
       "icon": "reception"
     },
     {
-      "time": "17:45",
+      "time": "18:00",
       "title": {
         "en": "Grand Entrance",
         "ja": "開宴・新郎新婦入場",
@@ -54,7 +54,7 @@
       "icon": "party"
     },
     {
-      "time": "18:00",
+      "time": "18:30",
       "title": {
         "en": "Meal & Conversation",
         "ja": "お食事歓談",
@@ -63,7 +63,7 @@
       "icon": "meal"
     },
     {
-      "time": "18:30",
+      "time": "19:00",
       "title": {
         "en": "Photo Session",
         "ja": "フォトラウンド",
@@ -72,7 +72,7 @@
       "icon": "camera"
     },
     {
-      "time": "19:00",
+      "time": "19:30",
       "title": {
         "en": "Games & Entertainment",
         "ja": "余興・ゲーム",
